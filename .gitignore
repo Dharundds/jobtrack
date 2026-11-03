@@ -1,0 +1,53 @@
+# ── Secrets & local config (never commit) ──
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+client_secret*.json
+token.json
+secrets/
+
+# ── Local data (Gmail tokens, email bodies, PII) ──
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# ── Go ──
+*.exe
+*.dll
+*.so
+*.dylib
+/bin/
+/dist/
+/jobtrack
+/jobtrack.exe
+coverage.out
+coverage.html
+*.test
+*.out
+
+# ── Frontend (web/) ──
+web/node_modules/
+web/dist/
+web/.vite/
+web/*.tsbuildinfo
+web/tsconfig.*.tsbuildinfo
+
+# ── IDE & OS ──
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ── Logs & temp ──
+*.log
+tmp/
+temp/
