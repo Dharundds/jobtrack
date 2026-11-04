@@ -74,12 +74,12 @@ export function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-        <p className="text-sm text-foreground-muted">Gmail sync and classification rules.</p>
-      </div>
+      <header>
+        <h1 className="page-title">Settings</h1>
+        <p className="page-lead">Gmail query, sync interval, and classification rules.</p>
+      </header>
 
-      <section className="space-y-4 rounded-xl border border-border p-4">
+      <section className="panel space-y-4 p-4">
         <h2 className="text-sm font-medium">Sync</h2>
         {settingsLoading ? (
           <Skeleton className="h-24" />
@@ -90,7 +90,7 @@ export function SettingsPage() {
               <input
                 value={gmailQuery}
                 onChange={(e) => setGmailQuery(e.target.value)}
-                className="mt-1 h-9 w-full rounded-lg border border-border bg-surface-elevated px-2 font-mono text-sm"
+                className="mt-1 h-9 w-full rounded-md border border-border bg-surface px-2 font-mono text-sm"
                 placeholder="e.g. newer_than:90d (subject:application OR ...)"
               />
             </label>
@@ -112,7 +112,7 @@ export function SettingsPage() {
         )}
       </section>
 
-      <section className="space-y-4 rounded-xl border border-border p-4">
+      <section className="panel space-y-4 p-4">
         <h2 className="text-sm font-medium">Classification rules</h2>
         {rulesLoading ? (
           <Skeleton className="h-40" />
@@ -213,7 +213,7 @@ function RuleRow({
         />
       </td>
       <td className="py-2 text-right">
-        <Button variant="secondary" size="sm" onClick={onDelete}>
+        <Button variant="danger" size="sm" onClick={onDelete}>
           Delete
         </Button>
       </td>

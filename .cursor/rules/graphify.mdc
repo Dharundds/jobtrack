@@ -1,0 +1,12 @@
+---
+description: Use the local graphify knowledge graph when exploring or changing this repo
+alwaysApply: true
+---
+
+# Graphify
+
+When answering questions about architecture, data flow, or where to edit:
+
+1. If `graphify-out/graph.json` exists, prefer **`graphify query`**, **`graphify explain`**, or **`graphify path`** over broad repo grep for structural questions.
+2. Rebuild when the graph is stale: `graphify extract . --code-only` (or full extract when `GEMINI_API_KEY` / `GOOGLE_API_KEY` is set).
+3. Do not skip the graph when it is present and the task is navigation or cross-module understanding.

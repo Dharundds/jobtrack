@@ -211,17 +211,17 @@ export function ApplicationDetailPage() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={onDeleteListing} disabled={deleteApp.isPending}>
+          <Button variant="danger" onClick={onDeleteListing} disabled={deleteApp.isPending}>
             Delete listing
           </Button>
-          <Button onClick={save} disabled={patch.isPending}>
+          <Button variant="secondary" onClick={save} disabled={patch.isPending}>
             {patch.isPending ? "Saving…" : "Save changes"}
           </Button>
         </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <section className="space-y-3 rounded-xl border border-border p-4">
+        <section className="panel space-y-3 p-4">
           <h2 className="text-sm font-medium">Details</h2>
           <label className="block text-xs text-foreground-muted">
             Company
@@ -282,7 +282,7 @@ export function ApplicationDetailPage() {
           </dl>
         </section>
 
-        <section className="space-y-3 rounded-xl border border-border p-4">
+        <section className="panel space-y-3 p-4">
           <h2 className="text-sm font-medium">Timeline</h2>
           {timeline.length === 0 ? (
             <p className="text-sm text-foreground-muted">No messages or events yet.</p>
@@ -302,7 +302,7 @@ export function ApplicationDetailPage() {
       </div>
 
       {mergeCandidates.length > 0 ? (
-        <section className="rounded-xl border border-border p-4">
+        <section className="panel p-4">
           <h2 className="text-sm font-medium">Merge duplicate</h2>
           <p className="mt-1 text-xs text-foreground-muted">
             Combine another application with the same company into this one.
@@ -329,7 +329,7 @@ export function ApplicationDetailPage() {
         </section>
       ) : null}
 
-      <section className="rounded-xl border border-border p-4">
+      <section className="panel p-4">
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-sm font-medium">Messages</h2>
           <Button variant="secondary" size="sm" onClick={() => refetch()}>
@@ -404,7 +404,7 @@ export function ApplicationDetailPage() {
                     Split out
                   </Button>
                   <Button
-                    variant="secondary"
+                    variant="danger"
                     size="sm"
                     onClick={() => onRemoveMessage(m)}
                     disabled={ignoreMsg.isPending}

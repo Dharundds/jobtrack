@@ -48,8 +48,8 @@ function KanbanCard({ app, dragging }: { app: Application; dragging?: boolean })
       ref={setNodeRef}
       style={style}
       className={cn(
-        "rounded-lg border border-border bg-surface-elevated p-3 shadow-sm",
-        (isDragging || dragging) && "opacity-60 ring-2 ring-accent/40",
+        "cursor-grab rounded-md border border-border bg-surface-elevated p-3 shadow-board active:cursor-grabbing",
+        (isDragging || dragging) && "opacity-70 ring-2 ring-accent/50",
       )}
       {...listeners}
       {...attributes}
@@ -62,7 +62,7 @@ function KanbanCard({ app, dragging }: { app: Application; dragging?: boolean })
         {app.company || "Unknown company"}
       </Link>
       <p className="mt-0.5 line-clamp-2 text-xs text-foreground-muted">{app.role || "—"}</p>
-      <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] text-foreground-muted">
+      <div className="mt-2 flex flex-wrap items-center gap-1.5 font-data text-[10px] text-foreground-muted">
         <span>{formatRelative(app.last_inbound_at ?? app.updated_at)}</span>
         {app.awaiting_my_reply ? (
           <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300">
@@ -86,10 +86,12 @@ function KanbanColumn({
   const { setNodeRef, isOver } = useDroppable({ id: status });
 
   return (
-    <div className="flex w-72 shrink-0 flex-col rounded-xl border border-border bg-surface-muted/40">
-      <div className="flex items-center justify-between border-b border-border px-3 py-2">
-        <span className="text-sm font-medium">{STATUS_LABELS[status]}</span>
-        <Badge className={cn("text-[10px]", STATUS_COLORS[status])}>{apps.length}</Badge>
+    <div className="flex w-72 shrink-0 flex-col rounded-md border border-border bg-surface-muted/50 shadow-board">
+      <div className="flex items-center justify-between border-b border-border bg-surface-elevated/80 px-3 py-2.5">
+        <span className="text-sm font-semibold">{STATUS_LABELS[status]}</span>
+        <Badge className={cn("font-data text-[10px]", STATUS_COLORS[status])}>
+          {apps.length}
+        </Badge>
       </div>
       <div
         ref={setNodeRef}
@@ -179,13 +181,15 @@ export function BoardPage() {
   const total = Object.values(byColumn).reduce((n, col) => n + col.length, 0);
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Board</h1>
-        <p className="text-sm text-foreground-muted">
-          Drag cards between columns to update status. {total} application{total === 1 ? "" : "s"}.
+    <div className="space-y-6">
+      <header>
+        <h1 className="page-title">Board</h1>
+        <p className="page-lead">
+          Drag rows between gates to update status.{" "}
+          <span className="font-data tabular-nums">{total}</span> application
+          {total === 1 ? "" : "s"} shown.
         </p>
-      </div>
+      </header>
 
       {total === 0 ? (
         <EmptyState
@@ -196,7 +200,7 @@ export function BoardPage() {
         />
       ) : (
         <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
-          <div className="flex gap-3 overflow-x-auto pb-4">
+          <div className="scrollbar-board flex gap-3 overflow-x-auto pb-4">
             {BOARD_STATUSES.map((status) => (
               <KanbanColumn
                 key={status}

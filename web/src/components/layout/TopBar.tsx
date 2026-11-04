@@ -18,6 +18,8 @@ export function TopBar({ searchQuery, onSearchChange }: TopBarProps) {
   const triggerSync = useTriggerSync();
   const { toast } = useToast();
 
+  const syncing = Boolean(sync?.running || triggerSync.isPending);
+
   const onSync = () => {
     triggerSync.mutate(undefined, {
       onSuccess: (res) => {
@@ -32,71 +34,78 @@ export function TopBar({ searchQuery, onSearchChange }: TopBarProps) {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface/80 px-4 backdrop-blur md:px-6">
-      <div className="relative min-w-0 flex-1 md:max-w-md">
-        <Search
-          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground-muted"
-          aria-hidden
-        />
-        <input
-          type="search"
-          value={searchQuery}
-          onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Search applications…"
-          aria-label="Search applications"
-          className={cn(
-            "h-9 w-full rounded-lg border border-border bg-surface-elevated pl-9 pr-3 text-sm",
-            "placeholder:text-foreground-muted",
-          )}
-        />
-      </div>
-
-      <div className="flex items-center gap-2">
-        <AuthAccountButton />
-
-        <div className="hidden flex-col items-end text-[10px] leading-tight text-foreground-muted lg:flex">
-          {sync?.running ? (
-            <span className="text-accent">Syncing…</span>
-          ) : sync?.last_synced_at ? (
-            <span>Last synced {formatRelative(sync.last_synced_at)}</span>
-          ) : (
-            <span>Not synced yet</span>
-          )}
-          {sync?.last_error ? (
-            <span className="max-w-[8rem] truncate text-status-rejected">Error</span>
-          ) : null}
+    <header
+      className={cn(
+        "sync-scan sticky top-0 z-30 shrink-0 border-b border-border bg-surface-elevated/95 backdrop-blur-sm",
+        syncing && "sync-scan-active",
+      )}
+    >
+      <div className="flex h-14 items-center gap-3 px-4 md:px-6">
+        <div className="relative min-w-0 flex-1 md:max-w-md">
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground-muted"
+            aria-hidden
+          />
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder="Filter company or role…"
+            aria-label="Search applications"
+            className={cn(
+              "h-9 w-full rounded-md border border-border bg-surface pl-9 pr-3 text-sm",
+              "placeholder:text-foreground-muted",
+            )}
+          />
         </div>
 
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={onSync}
-          disabled={triggerSync.isPending || sync?.running}
-          aria-label="Sync now"
-        >
-          {sync?.running || triggerSync.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-          ) : (
-            <RefreshCw className="h-4 w-4" aria-hidden />
-          )}
-          <span className="hidden sm:inline">Sync now</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <AuthAccountButton />
 
-        <button
-          type="button"
-          onClick={toggle}
-          className={cn(
-            "inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border",
-            "bg-surface-elevated text-foreground-muted hover:text-foreground",
-          )}
-          aria-label={resolved === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-        >
-          {resolved === "dark" ? (
-            <Sun className="h-4 w-4" aria-hidden />
-          ) : (
-            <Moon className="h-4 w-4" aria-hidden />
-          )}
-        </button>
+          <div className="hidden flex-col items-end font-data text-[10px] leading-tight text-foreground-muted lg:flex">
+            {syncing ? (
+              <span className="text-accent">SYNC ACTIVE</span>
+            ) : sync?.last_synced_at ? (
+              <span>UPD {formatRelative(sync.last_synced_at)}</span>
+            ) : (
+              <span>NO SYNC YET</span>
+            )}
+            {sync?.last_error ? (
+              <span className="max-w-[9rem] truncate text-status-rejected">ERR</span>
+            ) : null}
+          </div>
+
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={onSync}
+            disabled={syncing}
+            aria-label="Sync now"
+          >
+            {syncing ? (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+            ) : (
+              <RefreshCw className="h-4 w-4" aria-hidden />
+            )}
+            <span className="hidden sm:inline">Sync</span>
+          </Button>
+
+          <button
+            type="button"
+            onClick={toggle}
+            className={cn(
+              "inline-flex h-9 w-9 items-center justify-center rounded-md border border-border",
+              "bg-surface text-foreground-muted hover:text-foreground",
+            )}
+            aria-label={resolved === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {resolved === "dark" ? (
+              <Sun className="h-4 w-4" aria-hidden />
+            ) : (
+              <Moon className="h-4 w-4" aria-hidden />
+            )}
+          </button>
+        </div>
       </div>
     </header>
   );

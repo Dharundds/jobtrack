@@ -7,14 +7,14 @@ INSERT INTO rules (field, pattern, event_type, priority, enabled) VALUES
 ('subject', '(?i)acknowledg|confirm.*application|received your resume', 'acknowledged', 100, 1),
 ('body', '(?i)we have received your (application|resume)|thanks for your interest', 'acknowledged', 80, 1),
 
-('subject', '(?i)unfortunately|not moving forward|regret to inform|not selected|other candidates', 'rejected', 100, 1),
+('subject', '(?i)(not moving forward|regret to inform|not selected|decided to pursue other|will not be proceeding)', 'rejected', 100, 1),
 ('body', '(?i)unfortunately|not moving forward|regret to inform|will not be proceeding|decided to pursue other', 'rejected', 90, 1),
 
-('subject', '(?i)interview|phone screen|video call|schedule.*(call|chat|meet)', 'interview_invite', 100, 1),
-('body', '(?i)interview|schedule.*(call|meeting)|calendar invite|availability for a (call|chat)', 'interview_invite', 85, 1),
+('subject', '(?i)interview|phone screen|video call|schedule.*(call|chat|meet)|screening process|participate in (?:our |the )?screening|invites you to participate|invited to participate', 'interview_invite', 100, 1),
+('body', '(?i)interview|schedule.*(call|meeting)|calendar invite|availability for a (call|chat)|screening process|participate in (?:our |the )?screening|invites you to participate|joining us as (?:a|an)\s+\w|interest in joining us as', 'interview_invite', 85, 1),
 ('body', '(?i)zoom\.us/j/|meet\.google\.com/|teams\.microsoft\.com/', 'interview_invite', 70, 1),
 
-('subject', '(?i)assessment|take-home|coding challenge|hackerrank|codility', 'assessment', 100, 1),
+('subject', '(?i)assessment|take-home|coding challenge|hackerrank|codility|your screening for|screening for .+ successfully submitted|screening has been successfully submitted', 'assessment', 100, 1),
 ('body', '(?i)complete (the|this) assessment|online assessment|take-home', 'assessment', 90, 1),
 
 ('subject', '(?i)offer letter|pleased to offer|job offer|offer of employment', 'offer', 100, 1),

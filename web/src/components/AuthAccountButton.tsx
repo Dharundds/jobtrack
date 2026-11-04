@@ -10,7 +10,7 @@ export function AuthAccountButton() {
   if (isLoading) {
     return (
       <div
-        className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-surface-elevated px-3 text-sm text-foreground-muted"
+        className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-surface-elevated px-3 text-sm text-foreground-muted"
         aria-busy="true"
       >
         <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
@@ -24,7 +24,7 @@ export function AuthAccountButton() {
       <button
         type="button"
         onClick={() => refetch()}
-        className="h-9 rounded-lg border border-border px-3 text-sm text-foreground-muted hover:text-foreground"
+        className="h-9 rounded-md border border-border px-3 text-sm text-foreground-muted hover:text-foreground"
       >
         Retry account
       </button>
@@ -36,7 +36,7 @@ export function AuthAccountButton() {
       <Link
         to="/connect"
         className={cn(
-          "inline-flex h-9 items-center gap-2 rounded-lg border border-accent/30 bg-accent/10 px-3",
+          "inline-flex h-9 items-center gap-2 rounded-md border border-accent/40 bg-accent/10 px-3",
           "text-sm font-medium text-accent hover:bg-accent/15",
         )}
       >
@@ -52,7 +52,7 @@ export function AuthAccountButton() {
     <div className="flex items-center gap-1">
       <div
         className={cn(
-          "inline-flex h-9 max-w-[12rem] items-center gap-2 rounded-lg border border-border",
+          "inline-flex h-9 max-w-[12rem] items-center gap-2 rounded-md border border-border",
           "bg-surface-elevated px-3 text-sm font-medium text-foreground",
         )}
         title={email}
@@ -65,7 +65,7 @@ export function AuthAccountButton() {
         disabled={logout.isPending}
         onClick={() => logout.mutate()}
         className={cn(
-          "inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border",
+          "inline-flex h-9 w-9 items-center justify-center rounded-md border border-border",
           "bg-surface-elevated text-foreground-muted hover:text-foreground",
         )}
         aria-label="Disconnect Gmail"

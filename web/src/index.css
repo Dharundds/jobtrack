@@ -4,33 +4,39 @@
 
 @layer base {
   :root {
-    --surface: 250 250 250;
-    --surface-muted: 244 244 245;
-    --surface-elevated: 255 255 255;
-    --foreground: 24 24 27;
-    --foreground-muted: 113 113 122;
-    --border: 228 228 231;
-    --accent: 37 99 235;
-    --accent-foreground: 255 255 255;
-    --status-applied: 59 130 246;
-    --status-replied: 14 165 233;
-    --status-interview: 139 92 246;
-    --status-offer: 34 197 94;
-    --status-rejected: 239 68 68;
+    --surface: 244 241 234;
+    --surface-muted: 232 228 218;
+    --surface-elevated: 255 255 252;
+    --foreground: 22 26 32;
+    --foreground-muted: 82 88 98;
+    --border: 198 192 178;
+    --accent: 180 98 18;
+    --accent-foreground: 255 252 245;
+    --rail: 28 32 40;
+    --rail-foreground: 240 236 228;
+    --rail-muted: 148 156 168;
+    --status-applied: 41 98 168;
+    --status-replied: 14 116 144;
+    --status-interview: 109 40 160;
+    --status-offer: 22 128 72;
+    --status-rejected: 185 48 48;
   }
 
   .dark {
-    --surface: 9 9 11;
-    --surface-muted: 24 24 27;
-    --surface-elevated: 39 39 42;
-    --foreground: 250 250 250;
-    --foreground-muted: 161 161 170;
-    --border: 63 63 70;
-    --accent: 96 165 250;
-    --accent-foreground: 9 9 11;
+    --surface: 12 14 18;
+    --surface-muted: 18 22 30;
+    --surface-elevated: 23 27 36;
+    --foreground: 240 236 228;
+    --foreground-muted: 156 164 178;
+    --border: 42 48 62;
+    --accent: 212 146 42;
+    --accent-foreground: 14 14 12;
+    --rail: 8 10 14;
+    --rail-foreground: 232 228 218;
+    --rail-muted: 120 128 142;
     --status-applied: 96 165 250;
     --status-replied: 56 189 248;
-    --status-interview: 167 139 250;
+    --status-interview: 192 132 252;
     --status-offer: 74 222 128;
     --status-rejected: 248 113 113;
   }
@@ -39,8 +45,22 @@
     @apply border-border;
   }
 
+  html {
+    font-family: "Source Sans 3", system-ui, sans-serif;
+  }
+
   body {
     @apply bg-surface text-foreground;
+    background-image: linear-gradient(
+      rgb(var(--border) / 0.28) 1px,
+      transparent 1px
+    );
+    background-size: 100% 28px;
+  }
+
+  ::selection {
+    background: rgb(var(--accent) / 0.35);
+    color: rgb(var(--foreground));
   }
 
   :focus-visible {
@@ -51,5 +71,78 @@
   textarea,
   select {
     @apply text-foreground;
+  }
+
+  .font-data {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply rounded-md border border-border bg-surface-elevated shadow-board;
+  }
+
+  .page-title {
+    @apply text-2xl font-semibold tracking-tight text-foreground;
+  }
+
+  .page-lead {
+    @apply mt-1 max-w-prose text-sm text-foreground-muted;
+  }
+
+  .sync-scan {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .sync-scan::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 2px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgb(var(--accent)),
+      transparent
+    );
+    transform: translateX(-100%);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .sync-scan-active::after {
+    opacity: 1;
+    animation: board-scan 1.8s ease-in-out infinite;
+  }
+
+  @keyframes board-scan {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
+  }
+}
+
+@layer utilities {
+  .scrollbar-board {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--border)) transparent;
+  }
+
+  .scrollbar-board::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+  }
+
+  .scrollbar-board::-webkit-scrollbar-thumb {
+    background: rgb(var(--border));
+    border-radius: 4px;
   }
 }

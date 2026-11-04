@@ -205,7 +205,7 @@ func (w *Worker) syncOnce(ctx context.Context) (int, error) {
 	}
 
 	if fullSync {
-		since := time.Now().UTC().AddDate(0, 0, -5)
+		since := time.Now().UTC().AddDate(0, 0, -config.FullSyncDays)
 		ids, err = client.ListMessageIDs(ctx, query, since)
 		if err != nil {
 			return 0, err
