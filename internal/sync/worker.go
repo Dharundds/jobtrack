@@ -74,6 +74,11 @@ func (w *Worker) Start(ctx context.Context) {
 	}
 }
 
+// ResetSyncHistory clears the Gmail history cursor so the next sync uses the search query (full list).
+func (w *Worker) ResetSyncHistory(ctx context.Context) error {
+	return w.store.ClearSyncHistory(ctx)
+}
+
 // Trigger queues a sync (non-blocking). Returns false if a sync is already running.
 func (w *Worker) Trigger() bool {
 	w.mu.Lock()
@@ -297,7 +302,7 @@ func (w *Worker) fetchAndStore(
 					cancel()
 					return
 				}
-				fetchErr.Store(err)
+				fetchErr.Store(fmt.Errorf("%w", err))
 				cancel()
 				return
 			}
@@ -319,7 +324,7 @@ func (w *Worker) fetchAndStore(
 				ReceivedAt:  msg.ReceivedAt,
 			})
 			if err != nil {
-				fetchErr.Store(err)
+				fetchErr.Store(fmt.Errorf("%w", err))
 				cancel()
 				return
 			}

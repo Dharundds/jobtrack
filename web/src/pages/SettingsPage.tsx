@@ -6,6 +6,7 @@ import {
   usePatchSettings,
   useRules,
   useSettings,
+  useTriggerSync,
 } from "@/api/hooks";
 import type { Rule } from "@/api/types";
 import { Button } from "@/components/ui/Button";
@@ -20,6 +21,7 @@ export function SettingsPage() {
   const createRule = useCreateRule();
   const patchRule = usePatchRule();
   const deleteRule = useDeleteRule();
+  const triggerSync = useTriggerSync();
   const { toast } = useToast();
 
   const [gmailQuery, setGmailQuery] = useState("");
@@ -105,9 +107,36 @@ export function SettingsPage() {
                 className="mt-1 h-9 w-32 rounded-lg border border-border bg-surface-elevated px-2 text-sm"
               />
             </label>
-            <Button onClick={saveSettings} disabled={patchSettings.isPending}>
-              Save sync settings
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={saveSettings} disabled={patchSettings.isPending}>
+                Save sync settings
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={triggerSync.isPending}
+                onClick={() => {
+                  triggerSync.mutate(
+                    { full: true },
+                    {
+                      onSuccess: (res) => {
+                        if (res.message === "sync already running") {
+                          toast("Sync already running", "error");
+                          return;
+                        }
+                        toast("Full mailbox rescan started");
+                      },
+                      onError: (e) => toast(e.message, "error"),
+                    },
+                  );
+                }}
+              >
+                Full rescan
+              </Button>
+            </div>
+            <p className="text-xs text-foreground-muted">
+              After changing the Gmail query, run <strong className="font-medium text-foreground">Full rescan</strong>{" "}
+              so older matching mail is listed again (incremental sync only fetches new mail).
+            </p>
           </>
         )}
       </section>

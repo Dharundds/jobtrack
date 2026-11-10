@@ -62,6 +62,18 @@ func (s *Store) DeleteAllAccounts(ctx context.Context) error {
 	return err
 }
 
+// ClearSyncHistory removes the Gmail history cursor so the next sync re-lists mail via the search query.
+func (s *Store) ClearSyncHistory(ctx context.Context) error {
+	_, err := s.DB.ExecContext(ctx, `
+		UPDATE accounts SET history_id = NULL
+		WHERE id = (SELECT id FROM accounts ORDER BY id ASC LIMIT 1)
+	`)
+	if err != nil {
+		return fmt.Errorf("clear sync history: %w", err)
+	}
+	return nil
+}
+
 func scanAccount(row *sql.Row) (*Account, error) {
 	var a Account
 	var historyID, lastSynced sql.NullString

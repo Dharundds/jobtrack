@@ -196,10 +196,13 @@ export function useSyncStatus(enabled = true) {
 export function useTriggerSync() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () =>
-      apiFetch<{ ok: boolean; message?: string; status?: SyncStatus }>("/api/sync", {
-        method: "POST",
-      }),
+    mutationFn: (opts?: { full?: boolean }) =>
+      apiFetch<{ ok: boolean; message?: string; status?: SyncStatus }>(
+        opts?.full ? "/api/sync?full=true" : "/api/sync",
+        {
+          method: "POST",
+        },
+      ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.syncStatus });
       qc.invalidateQueries({ queryKey: ["applications"] });

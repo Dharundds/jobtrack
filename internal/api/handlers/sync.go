@@ -2,8 +2,11 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/dharundds/jobtrack/internal/api/apperrors"
+	"github.com/dharundds/jobtrack/internal/api/middleware"
 	syncworker "github.com/dharundds/jobtrack/internal/sync"
 )
 
@@ -12,7 +15,14 @@ type SyncHandler struct {
 }
 
 func (h *SyncHandler) Trigger(c *gin.Context) {
-	started, status := h.Worker.TriggerManual(c.Request.Context())
+	ctx := c.Request.Context()
+	if strings.EqualFold(c.Query("full"), "true") || strings.EqualFold(c.Query("full"), "1") {
+		if err := h.Worker.ResetSyncHistory(ctx); err != nil {
+			middleware.AbortWithError(c, apperrors.Internal("failed to reset sync history"))
+			return
+		}
+	}
+	started, status := h.Worker.TriggerManual(ctx)
 	if !started {
 		c.JSON(http.StatusAccepted, gin.H{
 			"ok":      true,
