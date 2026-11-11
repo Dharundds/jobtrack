@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -155,7 +156,7 @@ func (w *Worker) runSync(parent context.Context) {
 	w.mu.Lock()
 	w.processed = processed
 	if err != nil {
-		w.lastError = err.Error()
+		w.lastError = syncErrorMessage(err)
 	} else {
 		w.lastError = ""
 	}
@@ -224,6 +225,7 @@ func (w *Worker) syncOnce(ctx context.Context) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	newIDs = uniqueStrings(newIDs)
 	w.log.Info().
 		Int("listed", len(ids)).
 		Int("skipped_existing", skipped).
@@ -272,16 +274,28 @@ func (w *Worker) fetchAndStore(
 	var wg sync.WaitGroup
 
 	var stored atomic.Int32
-	var fetchErr atomic.Value // stores error
+	var failOnce sync.Once
+	var failErr error
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+
+	fail := func(err error) {
+		if err == nil || errors.Is(err, context.Canceled) {
+			return
+		}
+		failOnce.Do(func() {
+			failErr = err
+			w.log.Warn().Err(err).Msg("sync fetch failed")
+			cancel()
+		})
+	}
 
 	for _, id := range ids {
 		if ctx.Err() != nil {
 			break
 		}
-		if fetchErr.Load() != nil {
+		if failErr != nil {
 			break
 		}
 
@@ -291,19 +305,21 @@ func (w *Worker) fetchAndStore(
 			defer wg.Done()
 			defer func() { <-sem }()
 
-			if ctx.Err() != nil || fetchErr.Load() != nil {
+			if ctx.Err() != nil || failErr != nil {
 				return
 			}
 
 			msg, err := client.GetMessage(ctx, gmailID)
 			if err != nil {
-				if gmailclient.IsRateLimitError(err) {
-					fetchErr.Store(fmt.Errorf("gmail rate limit exceeded after retries: %w", err))
-					cancel()
+				if gmailclient.IsNotFound(err) {
+					w.log.Debug().Str("gmail_id", gmailID).Msg("skip missing message")
 					return
 				}
-				fetchErr.Store(fmt.Errorf("%w", err))
-				cancel()
+				if gmailclient.IsRateLimitError(err) {
+					fail(fmt.Errorf("gmail rate limit exceeded after retries: %w", err))
+					return
+				}
+				fail(err)
 				return
 			}
 
@@ -324,8 +340,11 @@ func (w *Worker) fetchAndStore(
 				ReceivedAt:  msg.ReceivedAt,
 			})
 			if err != nil {
-				fetchErr.Store(fmt.Errorf("%w", err))
-				cancel()
+				if store.IsDuplicateMessage(err) {
+					stored.Add(1)
+					return
+				}
+				fail(err)
 				return
 			}
 
@@ -343,10 +362,36 @@ func (w *Worker) fetchAndStore(
 
 	wg.Wait()
 
-	if v := fetchErr.Load(); v != nil {
-		return int(stored.Load()), v.(error)
+	if failErr != nil {
+		return int(stored.Load()), failErr
 	}
 	return int(stored.Load()), nil
+}
+
+func syncErrorMessage(err error) string {
+	if gmailclient.IsOAuthTokenError(err) {
+		return "Gmail authorization expired — disconnect and connect Gmail again"
+	}
+	return err.Error()
+}
+
+func uniqueStrings(in []string) []string {
+	if len(in) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(in))
+	out := make([]string, 0, len(in))
+	for _, s := range in {
+		if s == "" {
+			continue
+		}
+		if _, ok := seen[s]; ok {
+			continue
+		}
+		seen[s] = struct{}{}
+		out = append(out, s)
+	}
+	return out
 }
 
 func hasLabel(labels []string, want string) bool {

@@ -53,7 +53,8 @@ func NewClientFromAccount(
 		return nil, fmt.Errorf("decrypt refresh token: %w", err)
 	}
 	tok := &oauth2.Token{RefreshToken: refresh}
-	client := oauth.OAuthConfig().Client(ctx, tok)
+	// Token refresh must outlive per-sync cancellation (oauth2: client invalid after ctx ends).
+	client := oauth.OAuthConfig().Client(context.Background(), tok)
 	svc, err := gmail.NewService(ctx, option.WithHTTPClient(client))
 	if err != nil {
 		return nil, fmt.Errorf("gmail service: %w", err)
@@ -227,6 +228,26 @@ func parseEmailDate(raw string) time.Time {
 		return t.UTC()
 	}
 	return time.Now().UTC()
+}
+
+// IsNotFound reports whether err is a Gmail API 404 (e.g. message deleted).
+func IsNotFound(err error) bool {
+	var gerr *googleapi.Error
+	if errors.As(err, &gerr) && gerr.Code == 404 {
+		return true
+	}
+	return false
+}
+
+// IsOAuthTokenError reports refresh/revocation failures that require re-connecting Gmail.
+func IsOAuthTokenError(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := strings.ToLower(err.Error())
+	return strings.Contains(s, "invalid_grant") ||
+		strings.Contains(s, "cannot fetch token") ||
+		strings.Contains(s, "token expired and refresh token is not set")
 }
 
 func isHistoryExpired(err error) bool {

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -30,6 +31,14 @@ func (s *Store) HasMessage(ctx context.Context, gmailID string) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+// IsDuplicateMessage is true when gmail_id is already stored (e.g. concurrent sync inserts).
+func IsDuplicateMessage(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "unique constraint failed")
 }
 
 func (s *Store) InsertMessage(ctx context.Context, m MessageInsert) (int64, error) {

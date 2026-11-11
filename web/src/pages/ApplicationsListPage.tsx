@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { useAppOutletContext } from "@/lib/layout-context";
 import { formatDate, formatRelative } from "@/lib/dates";
 import { STATUS_COLORS, STATUS_LABELS } from "@/lib/status";
+import { GmailLink } from "@/components/GmailLink";
 import { cn } from "@/lib/utils";
 
 export function ApplicationsListPage() {
@@ -95,9 +96,17 @@ export function ApplicationsListPage() {
               {apps.map((app) => (
                 <tr key={app.id} className="border-b border-border last:border-0 hover:bg-surface-muted/50">
                   <td className="px-4 py-3">
-                    <Link to={`/applications/${app.id}`} className="font-medium hover:text-accent">
-                      {app.company || "Unknown company"}
-                    </Link>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Link to={`/applications/${app.id}`} className="font-medium hover:text-accent">
+                        {app.company || "Unknown company"}
+                      </Link>
+                      <GmailLink
+                        threadId={app.thread_id}
+                        className="text-foreground-muted no-underline hover:text-accent"
+                        label={`Open ${app.company || "application"} in Gmail`}
+                        showIcon
+                      />
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-foreground-muted">{app.role || "—"}</td>
                   <td className="px-4 py-3">

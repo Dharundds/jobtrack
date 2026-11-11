@@ -21,6 +21,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useAppOutletContext } from "@/lib/layout-context";
 import { formatRelative } from "@/lib/dates";
 import { BOARD_STATUSES, STATUS_COLORS, STATUS_LABELS } from "@/lib/status";
+import { GmailLink } from "@/components/GmailLink";
 import { cn } from "@/lib/utils";
 
 function matchesSearch(app: Application, q: string) {
@@ -54,13 +55,23 @@ function KanbanCard({ app, dragging }: { app: Application; dragging?: boolean })
       {...listeners}
       {...attributes}
     >
-      <Link
-        to={`/applications/${app.id}`}
-        className="block font-medium hover:text-accent"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {app.company || "Unknown company"}
-      </Link>
+      <div className="flex items-start justify-between gap-1">
+        <Link
+          to={`/applications/${app.id}`}
+          className="block font-medium hover:text-accent"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {app.company || "Unknown company"}
+        </Link>
+        <span onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
+          <GmailLink
+            threadId={app.thread_id}
+            className="shrink-0 text-foreground-muted no-underline hover:text-accent"
+            label={`Open ${app.company || "application"} in Gmail`}
+            showIcon
+          />
+        </span>
+      </div>
       <p className="mt-0.5 line-clamp-2 text-xs text-foreground-muted">{app.role || "—"}</p>
       <div className="mt-2 flex flex-wrap items-center gap-1.5 font-data text-[10px] text-foreground-muted">
         <span>{formatRelative(app.last_inbound_at ?? app.updated_at)}</span>

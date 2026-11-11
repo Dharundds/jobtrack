@@ -16,7 +16,9 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import { formatDate, formatRelative } from "@/lib/dates";
+import { GmailLink } from "@/components/GmailLink";
 import { guessCompanyFromMessage, guessRoleFromMessage } from "@/lib/message-guess";
+import { gmailUrl } from "@/lib/gmail";
 import { STATUS_COLORS, STATUS_LABELS } from "@/lib/status";
 import { cn } from "@/lib/utils";
 
@@ -186,6 +188,7 @@ export function ApplicationDetailPage() {
       at: m.received_at,
       label: m.direction === "in" ? "Inbound" : "Outbound",
       detail: m.subject || m.snippet,
+      message: m,
     })),
   ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
 
@@ -198,6 +201,11 @@ export function ApplicationDetailPage() {
           </Link>
           <h1 className="mt-1 text-2xl font-semibold">{app.company || "Unknown company"}</h1>
           <p className="text-foreground-muted">{app.role || "Role not set"}</p>
+          {gmailUrl({ threadId: app.thread_id }) ? (
+            <GmailLink threadId={app.thread_id} className="mt-1 text-xs font-normal" showIcon>
+              Open thread in Gmail
+            </GmailLink>
+          ) : null}
           <div className="mt-2 flex flex-wrap gap-2">
             <Badge className={cn(STATUS_COLORS[app.status])}>{STATUS_LABELS[app.status]}</Badge>
             {app.awaiting_my_reply ? (
@@ -293,7 +301,17 @@ export function ApplicationDetailPage() {
                   <p className="text-[10px] uppercase tracking-wide text-foreground-muted">
                     {item.label} · {formatRelative(item.at)}
                   </p>
-                  <p className="text-sm">{item.detail || "—"}</p>
+                  {item.kind === "message" && item.message ? (
+                    <GmailLink
+                      threadId={item.message.thread_id}
+                      gmailId={item.message.gmail_id}
+                      className="text-sm font-normal text-foreground"
+                    >
+                      {item.detail || "(no subject)"}
+                    </GmailLink>
+                  ) : (
+                    <p className="text-sm">{item.detail || "—"}</p>
+                  )}
                 </li>
               ))}
             </ul>
@@ -384,9 +402,14 @@ export function ApplicationDetailPage() {
                     <span>{formatRelative(m.received_at)}</span>
                     {m.event_type ? <span>{m.event_type}</span> : null}
                   </div>
-                  <p className="mt-1 font-medium text-foreground">
+                  <GmailLink
+                    threadId={m.thread_id}
+                    gmailId={m.gmail_id}
+                    className="mt-1 font-medium text-foreground no-underline hover:text-accent hover:underline"
+                    showIcon
+                  >
                     {m.subject || "(no subject)"}
-                  </p>
+                  </GmailLink>
                   <p className="mt-1 line-clamp-3 text-sm text-foreground-muted">
                     {m.body_excerpt || m.snippet}
                   </p>
