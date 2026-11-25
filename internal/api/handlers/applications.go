@@ -7,12 +7,15 @@ import (
 	"github.com/dharundds/jobtrack/internal/api/apperrors"
 	"github.com/dharundds/jobtrack/internal/api/middleware"
 	"github.com/dharundds/jobtrack/internal/api/present"
+	"github.com/dharundds/jobtrack/internal/classify"
+	"github.com/dharundds/jobtrack/internal/config"
 	"github.com/dharundds/jobtrack/internal/store"
 	"github.com/gin-gonic/gin"
 )
 
 type ApplicationsHandler struct {
 	Store *store.Store
+	Cfg   *config.Config
 }
 
 func (h *ApplicationsHandler) loadApplicationJSON(c *gin.Context, app store.ApplicationFull) (present.ApplicationJSON, error) {
@@ -96,9 +99,10 @@ func (h *ApplicationsHandler) Get(c *gin.Context) {
 		evOut[i] = present.EventFromStore(e)
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"application": j,
-		"messages":    msgOut,
-		"events":      evOut,
+		"application":      j,
+		"messages":           msgOut,
+		"events":             evOut,
+		"needs_llm_review":   classify.NeedsLLMReview(msgs),
 	})
 }
 

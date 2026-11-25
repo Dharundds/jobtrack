@@ -23,7 +23,16 @@ func NewProcessor(st *store.Store, log zerolog.Logger) *Processor {
 }
 
 // Run classifies and groups all messages without application_id.
-func (p *Processor) Run(ctx context.Context, accountEmail string) (linked int, err error) {
+func (p *Processor) Run(ctx context.Context, accountEmail string, opts RunOptions) (linked int, err error) {
+	msgs, err := p.store.ListUnlinkedMessages(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return p.RunMessages(ctx, accountEmail, msgs, opts)
+}
+
+// RunMessages classifies and groups the given unlinked messages (caller picks order/limit).
+func (p *Processor) RunMessages(ctx context.Context, accountEmail string, msgs []store.MessageRow, opts RunOptions) (linked int, err error) {
 	rules, err := p.store.ListEnabledRules(ctx)
 	if err != nil {
 		return 0, err
@@ -39,12 +48,13 @@ func (p *Processor) Run(ctx context.Context, accountEmail string) (linked int, e
 			Enabled:   r.Enabled,
 		}
 	}
-	classifier := NewRuleClassifier(clRules)
-
-	msgs, err := p.store.ListUnlinkedMessages(ctx)
-	if err != nil {
-		return 0, err
+	ruleClassifier := NewRuleClassifier(clRules)
+	if opts.LLMAvailable && opts.LLM != nil {
+		p.log.Info().Int("llm_concurrency", opts.LLMConcurrency).Int("messages", len(msgs)).Msg("classify using llm with rule fallback")
+	} else {
+		p.log.Info().Int("messages", len(msgs)).Msg("classify using rules")
 	}
+
 	if len(msgs) == 0 {
 		return 0, nil
 	}
@@ -60,18 +70,15 @@ func (p *Processor) Run(ctx context.Context, accountEmail string) (linked int, e
 	threadMap := make(map[string]int64)
 	touchedApps := make(map[int64]struct{})
 
-	for _, m := range msgs {
-		in := EmailInput{
-			From:         m.FromAddr,
-			To:           m.ToAddr,
-			Subject:      m.Subject,
-			Body:         m.BodyExcerpt,
-			Snippet:      m.Snippet,
-			Direction:    m.Direction,
-			AccountEmail: accountEmail,
-			ReceivedAt:   m.ReceivedAt,
+	results := ClassifyMessages(ctx, p.log, msgs, accountEmail, ruleClassifier, opts)
+	llmReviewed := countLLMInMap(results)
+
+	for i, m := range msgs {
+		res, ok := results[m.ID]
+		if !ok {
+			continue
 		}
-		res := classifier.Classify(in)
+		in := emailInputFromMessage(m, accountEmail)
 		res = RefineResult(in, res)
 		if res.Company == "" || res.Role == "" {
 			if c := ExtractCompany(m.FromAddr, m.Subject, m.BodyExcerpt); res.Company == "" {
@@ -136,6 +143,16 @@ func (p *Processor) Run(ctx context.Context, accountEmail string) (linked int, e
 		}
 
 		linked++
+
+		if opts.OnProgress != nil {
+			opts.OnProgress(Progress{
+				Phase:              "group",
+				ClassifyTotal:      len(msgs),
+				ClassifyDone:       i + 1,
+				LLMReviewed:        llmReviewed,
+				ApplicationsLinked: len(touchedApps),
+			})
+		}
 	}
 
 	for id := range touchedApps {

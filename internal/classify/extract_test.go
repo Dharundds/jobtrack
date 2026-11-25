@@ -1,6 +1,7 @@
 package classify
 
 import (
+	"context"
 	"strings"
 	"testing"
 )
@@ -97,7 +98,7 @@ func TestRuleClassifier_thalesScreeningInvite(t *testing.T) {
 		Subject: "Thales - Invites you to participate in our screening process",
 		Body:    "joining us as a Golang Developer",
 	}
-	res := RefineResult(in, c.Classify(in))
+	res := RefineResult(in, c.Classify(context.Background(), in))
 	if res.EventType != EventInterviewInvite {
 		t.Fatalf("event = %q", res.EventType)
 	}

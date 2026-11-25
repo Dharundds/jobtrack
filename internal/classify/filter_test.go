@@ -1,6 +1,9 @@
 package classify
 
-import "testing"
+import (
+	"context"
+	"testing"
+)
 
 func TestRefineResult_rejectionNoise(t *testing.T) {
 	c := NewRuleClassifier(testRules())
@@ -10,7 +13,7 @@ func TestRefineResult_rejectionNoise(t *testing.T) {
 		Subject: "Unfortunately, this offer expired",
 		Body:    "Shop our sale today.",
 	}
-	res := RefineResult(news, c.Classify(news))
+	res := RefineResult(news, c.Classify(context.Background(), news))
 	if res.EventType != EventOther {
 		t.Fatalf("EventType = %q, want other", res.EventType)
 	}
@@ -26,7 +29,7 @@ func TestRefineResult_workdayRejection(t *testing.T) {
 		Subject: "Update on your application",
 		Body:    "Unfortunately we will not be moving forward.",
 	}
-	res := RefineResult(in, c.Classify(in))
+	res := RefineResult(in, c.Classify(context.Background(), in))
 	if res.EventType != EventRejected {
 		t.Fatalf("EventType = %q, want rejected", res.EventType)
 	}
@@ -54,7 +57,7 @@ func TestRefineResult_linkedinJobRejection(t *testing.T) {
 		Subject: "Unfortunately, we decided not to move forward",
 		Body:    "Thank you for your interest.",
 	}
-	res := RefineResult(in, c.Classify(in))
+	res := RefineResult(in, c.Classify(context.Background(), in))
 	if res.EventType != EventRejected {
 		t.Fatalf("EventType = %q, want rejected", res.EventType)
 	}

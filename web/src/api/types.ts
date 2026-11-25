@@ -42,6 +42,7 @@ export type Message = {
   body_excerpt: string;
   received_at: string;
   event_type: string;
+  classified_by?: string;
   thread_id?: string;
   gmail_id?: string;
 };
@@ -58,6 +59,14 @@ export type ApplicationDetail = {
   application: Application;
   messages: Message[];
   events: TimelineEvent[];
+  needs_llm_review?: boolean;
+};
+
+export type ReviewLLMResult = {
+  action: "updated" | "deleted";
+  reason?: string;
+  application?: Application;
+  application_deleted: boolean;
 };
 
 export type Rule = {
@@ -74,6 +83,21 @@ export type SyncStatus = {
   last_synced_at?: string;
   last_error?: string;
   processed?: number;
+  classifier?: "llm" | "rule";
+  sync_phase?: "fetch" | "classify" | "group";
+  classify_total?: number;
+  classify_done?: number;
+  llm_reviewed?: number;
+  applications_linked?: number;
+  llm_classify_running?: boolean;
+  llm_classify_error?: string;
+};
+
+export type LLMClassifyPending = {
+  /** Pipeline applications not yet fully LLM-reviewed. */
+  pending: number;
+  /** Synced mail stored but not linked to any application (not shown in the UI). */
+  unlinked_messages?: number;
 };
 
 export type Stats = {
@@ -86,6 +110,10 @@ export type Stats = {
 export type Settings = {
   sync_interval_minutes: number;
   gmail_query: string;
+  llm_base_url: string;
+  llm_model: string;
+  llm_api_key_set: boolean;
+  llm_concurrency: number;
 };
 
 export type ApiErrorBody = {
@@ -116,6 +144,11 @@ export type MergeApplicationsInput = {
 export type PatchSettingsInput = {
   sync_interval_minutes?: number;
   gmail_query?: string;
+  llm_base_url?: string;
+  llm_model?: string;
+  /** Set to update key; omit to leave unchanged; empty string clears */
+  llm_api_key?: string;
+  llm_concurrency?: number;
 };
 
 export type CreateRuleInput = {

@@ -95,6 +95,9 @@ func htmlToText(src string) string {
 	var b strings.Builder
 	var walk func(*html.Node)
 	walk = func(n *html.Node) {
+		if n.Type == html.ElementNode && (n.Data == "script" || n.Data == "style" || n.Data == "head" || n.Data == "noscript") {
+			return
+		}
 		if n.Type == html.TextNode {
 			b.WriteString(n.Data)
 			b.WriteString(" ")

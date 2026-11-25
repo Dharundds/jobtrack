@@ -1,6 +1,7 @@
 package classify
 
 import (
+	"context"
 	"testing"
 	"time"
 )
@@ -223,7 +224,7 @@ func TestRuleClassifier_samples(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := c.Classify(tt.in)
+			got := c.Classify(context.Background(), tt.in)
 			if got.EventType != tt.want {
 				t.Fatalf("EventType = %q, want %q", got.EventType, tt.want)
 			}

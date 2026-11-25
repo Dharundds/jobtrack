@@ -14,6 +14,7 @@ import (
 	"github.com/dharundds/jobtrack/internal/classify"
 	"github.com/dharundds/jobtrack/internal/config"
 	gmailclient "github.com/dharundds/jobtrack/internal/gmail"
+	"github.com/dharundds/jobtrack/internal/llm"
 	"github.com/dharundds/jobtrack/internal/privacy"
 	"github.com/dharundds/jobtrack/internal/store"
 	"github.com/rs/zerolog"
@@ -25,6 +26,14 @@ type Status struct {
 	LastSyncedAt *time.Time `json:"last_synced_at,omitempty"`
 	LastError    string     `json:"last_error,omitempty"`
 	Processed    int        `json:"processed,omitempty"`
+	Classifier   string     `json:"classifier,omitempty"` // llm | rule (last classify pass)
+	SyncPhase    string     `json:"sync_phase,omitempty"` // fetch | classify | group
+	ClassifyTotal       int `json:"classify_total,omitempty"`
+	ClassifyDone        int `json:"classify_done,omitempty"`
+	LLMReviewed         int `json:"llm_reviewed,omitempty"`
+	ApplicationsLinked  int `json:"applications_linked,omitempty"`
+	LLMClassifyRunning  bool   `json:"llm_classify_running,omitempty"`
+	LLMClassifyError    string `json:"llm_classify_error,omitempty"`
 }
 
 type Worker struct {
@@ -33,10 +42,19 @@ type Worker struct {
 	auth  *auth.Service
 	log   zerolog.Logger
 
-	mu        sync.RWMutex
-	running   bool
-	lastError string
-	processed int
+	mu                 sync.RWMutex
+	running            bool
+	lastError          string
+	processed          int
+	lastClassifier     string
+	syncPhase          string
+	classifyTotal      int
+	classifyDone       int
+	llmReviewed        int
+	applicationsLinked int
+
+	llmClassifyRunning bool
+	llmClassifyError   string
 
 	trigger chan struct{}
 }
@@ -112,6 +130,106 @@ func (w *Worker) TriggerManual(ctx context.Context) (started bool, status Status
 	return true, Status{}
 }
 
+// TriggerLLMClassify starts a background LLM review pass for up to limit pipeline applications (newest activity first).
+func (w *Worker) TriggerLLMClassify(ctx context.Context, limit int) (started bool, status Status) {
+	w.mu.Lock()
+	if w.running || w.llmClassifyRunning {
+		status = w.statusLocked(ctx)
+		w.mu.Unlock()
+		return false, status
+	}
+	w.llmClassifyRunning = true
+	w.llmClassifyError = ""
+	w.syncPhase = "classify"
+	w.classifyTotal = 0
+	w.classifyDone = 0
+	w.llmReviewed = 0
+	w.applicationsLinked = 0
+	w.mu.Unlock()
+
+	go w.runLLMClassify(limit)
+	return true, Status{}
+}
+
+func (w *Worker) runLLMClassify(limit int) {
+	defer func() {
+		w.mu.Lock()
+		w.llmClassifyRunning = false
+		w.syncPhase = ""
+		w.mu.Unlock()
+	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	defer cancel()
+
+	acc, err := w.store.GetAccount(ctx)
+	if err != nil {
+		w.mu.Lock()
+		w.llmClassifyError = "no connected account"
+		w.mu.Unlock()
+		return
+	}
+
+	cfg, err := w.store.LLMConfig(ctx, w.cfg.TokenEncKey)
+	if err != nil || !cfg.Configured() {
+		w.mu.Lock()
+		w.llmClassifyError = "llm not configured"
+		w.mu.Unlock()
+		return
+	}
+	client := llm.NewClient(cfg)
+	if !client.Ping(ctx) {
+		w.mu.Lock()
+		w.llmClassifyError = "llm not reachable"
+		w.mu.Unlock()
+		return
+	}
+
+	appIDs, err := w.store.ListApplicationIDsNeedingLLMReview(ctx, limit)
+	if err != nil {
+		w.mu.Lock()
+		w.llmClassifyError = err.Error()
+		w.mu.Unlock()
+		return
+	}
+	if len(appIDs) == 0 {
+		w.log.Info().Msg("llm classify: no pipeline applications need review")
+		return
+	}
+
+	conc, _ := w.store.LLMConcurrency(ctx, 2)
+	log := w.log.With().Str("component", "llm-classify").Logger()
+	reviewed := 0
+	var procErr error
+	for i, appID := range appIDs {
+		_, err := llm.ReviewApplicationWithLLM(ctx, w.store, log, client, acc.Email, appID, conc)
+		if err != nil {
+			procErr = err
+			w.log.Warn().Err(err).Int64("application_id", appID).Msg("llm review application failed")
+			break
+		}
+		reviewed++
+		w.onClassifyProgress(classify.Progress{
+			Phase:              "classify",
+			ClassifyTotal:      len(appIDs),
+			ClassifyDone:       i + 1,
+			LLMReviewed:        reviewed,
+			ApplicationsLinked: reviewed,
+		})
+	}
+	w.mu.Lock()
+	w.lastClassifier = "llm"
+	if procErr != nil {
+		w.llmClassifyError = procErr.Error()
+	}
+	w.mu.Unlock()
+	if procErr != nil {
+		w.log.Warn().Err(procErr).Int("reviewed", reviewed).Msg("llm classify failed")
+		return
+	}
+	w.log.Info().Int("applications_reviewed", reviewed).Msg("llm classify done")
+}
+
 func (w *Worker) StatusSnapshot(ctx context.Context) Status {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
@@ -120,9 +238,17 @@ func (w *Worker) StatusSnapshot(ctx context.Context) Status {
 
 func (w *Worker) statusLocked(ctx context.Context) Status {
 	st := Status{
-		Running:   w.running,
-		LastError: w.lastError,
-		Processed: w.processed,
+		Running:            w.running,
+		LastError:          w.lastError,
+		Processed:          w.processed,
+		Classifier:         w.lastClassifier,
+		SyncPhase:          w.syncPhase,
+		ClassifyTotal:      w.classifyTotal,
+		ClassifyDone:       w.classifyDone,
+		LLMReviewed:        w.llmReviewed,
+		ApplicationsLinked: w.applicationsLinked,
+		LLMClassifyRunning: w.llmClassifyRunning,
+		LLMClassifyError:   w.llmClassifyError,
 	}
 	acc, err := w.store.GetAccount(ctx)
 	if err == nil && acc.LastSyncedAt.Valid {
@@ -141,6 +267,11 @@ func (w *Worker) runSync(parent context.Context) {
 	w.running = true
 	w.lastError = ""
 	w.processed = 0
+	w.syncPhase = "fetch"
+	w.classifyTotal = 0
+	w.classifyDone = 0
+	w.llmReviewed = 0
+	w.applicationsLinked = 0
 	w.mu.Unlock()
 
 	defer func() {
@@ -243,8 +374,27 @@ func (w *Worker) syncOnce(ctx context.Context) (int, error) {
 		return stored, err
 	}
 
+	runOpts := classify.RunOptions{OnProgress: w.onClassifyProgress}
+	w.mu.Lock()
+	w.lastClassifier = "rule"
+	w.mu.Unlock()
+	w.log.Info().Msg("sync classify using rules only")
+
+	if revived, err := w.store.ReviveIgnoredApplicationConfirmations(ctx); err != nil {
+		w.log.Warn().Err(err).Msg("revive ignored application confirmations")
+	} else if revived > 0 {
+		w.log.Info().Int64("count", revived).Msg("revived ignored application confirmation messages")
+	}
+
+	w.mu.Lock()
+	w.syncPhase = "classify"
+	w.mu.Unlock()
+
 	processor := classify.NewProcessor(w.store, w.log)
-	linked, procErr := processor.Run(ctx, acc.Email)
+	linked, procErr := processor.Run(ctx, acc.Email, runOpts)
+	w.mu.Lock()
+	w.syncPhase = ""
+	w.mu.Unlock()
 	if procErr != nil {
 		w.log.Warn().Err(procErr).Int("linked", linked).Msg("classify/group failed")
 		return stored, procErr
@@ -373,6 +523,16 @@ func syncErrorMessage(err error) string {
 		return "Gmail authorization expired — disconnect and connect Gmail again"
 	}
 	return err.Error()
+}
+
+func (w *Worker) onClassifyProgress(p classify.Progress) {
+	w.mu.Lock()
+	w.syncPhase = p.Phase
+	w.classifyTotal = p.ClassifyTotal
+	w.classifyDone = p.ClassifyDone
+	w.llmReviewed = p.LLMReviewed
+	w.applicationsLinked = p.ApplicationsLinked
+	w.mu.Unlock()
 }
 
 func uniqueStrings(in []string) []string {

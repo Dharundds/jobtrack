@@ -11,9 +11,11 @@ import type {
   PatchApplicationInput,
   PatchRuleInput,
   PatchSettingsInput,
+  ReviewLLMResult,
   Rule,
   Settings,
   Stats,
+  LLMClassifyPending,
   SyncStatus,
 } from "@/api/types";
 
@@ -75,6 +77,18 @@ export function useApplication(id: number) {
     queryKey: queryKeys.application(id),
     queryFn: () => apiFetch<ApplicationDetail>(`/api/applications/${id}`),
     enabled: id > 0,
+  });
+}
+
+export function useReviewApplicationLLM(id: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiFetch<ReviewLLMResult>(`/api/applications/${id}/review-llm`, { method: "POST" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.application(id) });
+      qc.invalidateQueries({ queryKey: ["applications"] });
+      qc.invalidateQueries({ queryKey: queryKeys.stats });
+    },
   });
 }
 
@@ -188,8 +202,34 @@ export function useSyncStatus(enabled = true) {
   return useQuery({
     queryKey: queryKeys.syncStatus,
     queryFn: () => apiFetch<SyncStatus>("/api/sync/status"),
-    refetchInterval: (q) => (q.state.data?.running ? 2000 : false),
+    refetchInterval: (q) =>
+      q.state.data?.running || q.state.data?.llm_classify_running ? 2000 : false,
     enabled,
+  });
+}
+
+export function useLLMClassifyPending(enabled = true) {
+  return useQuery({
+    queryKey: ["classify", "llm", "pending"] as const,
+    queryFn: () => apiFetch<LLMClassifyPending>("/api/classify/llm/pending"),
+    enabled,
+  });
+}
+
+export function useTriggerLLMClassify() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { limit: number }) =>
+      apiFetch<{ ok: boolean; message?: string; status?: SyncStatus }>("/api/classify/llm", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.syncStatus });
+      qc.invalidateQueries({ queryKey: ["classify", "llm", "pending"] });
+      qc.invalidateQueries({ queryKey: ["applications"] });
+      qc.invalidateQueries({ queryKey: queryKeys.stats });
+    },
   });
 }
 
@@ -234,6 +274,15 @@ export function usePatchSettings() {
         body: JSON.stringify(body),
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.settings }),
+  });
+}
+
+export function useTestLLM() {
+  return useMutation({
+    mutationFn: () =>
+      apiFetch<{ ok: boolean; reachable: boolean }>("/api/settings/llm/test", {
+        method: "POST",
+      }),
   });
 }
 

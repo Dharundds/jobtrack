@@ -1,5 +1,7 @@
-import { Loader2, RefreshCw, Search, Sun, Moon } from "lucide-react";
+import { useState } from "react";
+import { Bot, Loader2, RefreshCw, Search, Sun, Moon } from "lucide-react";
 import { AuthAccountButton } from "@/components/AuthAccountButton";
+import { LLMClassifyDialog } from "@/components/LLMClassifyDialog";
 import { Button } from "@/components/ui/Button";
 import { useSyncStatus, useTriggerSync } from "@/api/hooks";
 import { useToast } from "@/components/ui/Toast";
@@ -17,8 +19,11 @@ export function TopBar({ searchQuery, onSearchChange }: TopBarProps) {
   const { data: sync } = useSyncStatus();
   const triggerSync = useTriggerSync();
   const { toast } = useToast();
+  const [llmDialogOpen, setLlmDialogOpen] = useState(false);
 
   const syncing = Boolean(sync?.running || triggerSync.isPending);
+  const llmClassifying = Boolean(sync?.llm_classify_running);
+  const busy = syncing || llmClassifying;
 
   const onSync = () => {
     triggerSync.mutate(undefined, {
@@ -37,9 +42,10 @@ export function TopBar({ searchQuery, onSearchChange }: TopBarProps) {
     <header
       className={cn(
         "sync-scan sticky top-0 z-30 shrink-0 border-b border-border bg-surface-elevated/95 backdrop-blur-sm",
-        syncing && "sync-scan-active",
+        busy && "sync-scan-active",
       )}
     >
+      <LLMClassifyDialog open={llmDialogOpen} onClose={() => setLlmDialogOpen(false)} />
       <div className="flex h-14 items-center gap-3 px-4 md:px-6">
         <div className="relative min-w-0 flex-1 md:max-w-md">
           <Search
@@ -63,23 +69,56 @@ export function TopBar({ searchQuery, onSearchChange }: TopBarProps) {
           <AuthAccountButton />
 
           <div className="hidden flex-col items-end font-data text-[10px] leading-tight text-foreground-muted lg:flex">
-            {syncing ? (
-              <span className="text-accent">SYNC ACTIVE</span>
+            {llmClassifying ? (
+              <span className="text-accent">
+                LLM{" "}
+                {(sync?.classify_total ?? 0) > 0
+                  ? `· ${sync?.classify_done ?? 0}/${sync?.classify_total ?? 0} · model ${sync?.llm_reviewed ?? 0}`
+                  : "ACTIVE"}
+              </span>
+            ) : syncing ? (
+              <span className="text-accent">
+                SYNC{" "}
+                {sync?.sync_phase === "fetch" && sync.processed != null
+                  ? `· ${sync.processed} msgs`
+                  : sync?.sync_phase === "classify" && (sync.classify_total ?? 0) > 0
+                    ? `· ${sync.classify_done ?? 0}/${sync.classify_total} rules`
+                    : sync?.sync_phase === "group" && (sync.classify_total ?? 0) > 0
+                      ? `· group ${sync.classify_done ?? 0}/${sync.classify_total} · ${sync.applications_linked ?? 0} apps`
+                      : "ACTIVE"}
+              </span>
             ) : sync?.last_synced_at ? (
-              <span>UPD {formatRelative(sync.last_synced_at)}</span>
+              <span>
+                UPD {formatRelative(sync.last_synced_at)}
+                {sync.classifier ? ` · ${sync.classifier.toUpperCase()}` : ""}
+              </span>
             ) : (
               <span>NO SYNC YET</span>
             )}
             {sync?.last_error ? (
-              <span className="max-w-[9rem] truncate text-status-rejected">ERR</span>
+              <span className="max-w-[9rem] truncate text-status-rejected">SYNC ERR</span>
+            ) : null}
+            {sync?.llm_classify_error ? (
+              <span className="max-w-[9rem] truncate text-status-rejected">LLM ERR</span>
             ) : null}
           </div>
 
           <Button
+            variant="secondary"
+            size="md"
+            onClick={() => setLlmDialogOpen(true)}
+            disabled={busy}
+            aria-label="Classify with LLM"
+          >
+            <Bot className="h-4 w-4" aria-hidden />
+            <span className="hidden sm:inline">LLM</span>
+          </Button>
+
+          <Button
             variant="primary"
-            size="sm"
+            size="md"
             onClick={onSync}
-            disabled={syncing}
+            disabled={busy}
             aria-label="Sync now"
           >
             {syncing ? (

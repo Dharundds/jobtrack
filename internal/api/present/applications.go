@@ -36,9 +36,10 @@ type MessageJSON struct {
 	Snippet     string    `json:"snippet"`
 	BodyExcerpt string    `json:"body_excerpt"`
 	ReceivedAt  time.Time `json:"received_at"`
-	EventType   string    `json:"event_type"`
-	ThreadID    string    `json:"thread_id,omitempty"`
-	GmailID     string    `json:"gmail_id,omitempty"`
+	EventType    string    `json:"event_type"`
+	ClassifiedBy string    `json:"classified_by,omitempty"`
+	ThreadID     string    `json:"thread_id,omitempty"`
+	GmailID      string    `json:"gmail_id,omitempty"`
 }
 
 type EventJSON struct {
@@ -106,8 +107,9 @@ func MessageFromStore(m store.MessageRow, includeGmail bool) MessageJSON {
 		Snippet:     m.Snippet,
 		BodyExcerpt: m.BodyExcerpt,
 		ReceivedAt:  m.ReceivedAt,
-		EventType:   m.EventType,
-		ThreadID:    m.ThreadID,
+		EventType:    m.EventType,
+		ClassifiedBy: m.ClassifiedBy,
+		ThreadID:     m.ThreadID,
 	}
 	if includeGmail {
 		j.GmailID = m.GmailID

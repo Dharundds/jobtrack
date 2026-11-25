@@ -54,3 +54,22 @@ func (s *Store) InsertMessage(ctx context.Context, m MessageInsert) (int64, erro
 	}
 	return res.LastInsertId()
 }
+
+// ReviveIgnoredApplicationConfirmations un-ignores messages that look like real application receipts
+// (e.g. after a listing was deleted by mistake). They become eligible for sync classify on the next pass.
+func (s *Store) ReviveIgnoredApplicationConfirmations(ctx context.Context) (int64, error) {
+	res, err := s.DB.ExecContext(ctx, `
+		UPDATE messages SET ignored = 0
+		WHERE ignored = 1 AND application_id IS NULL
+		AND (
+			(LOWER(subject) LIKE '%application for%' AND LOWER(subject) LIKE '%received%')
+			OR LOWER(snippet) LIKE '%thank you for applying%'
+			OR LOWER(body_excerpt) LIKE '%thank you for applying%'
+			OR LOWER(snippet) LIKE '%we have received your application%'
+			OR LOWER(body_excerpt) LIKE '%we have received your application%'
+		)`)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}

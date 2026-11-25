@@ -13,6 +13,15 @@ func RefineResult(in EmailInput, res Result) Result {
 	if res.EventType == EventRecruiterOutreach && isLinkedInSocialNoise(in) {
 		res.EventType = EventOther
 	}
+	if isJobBoardAlert(in.From, in.Subject, in.Body, in.Snippet) {
+		res.EventType = EventOther
+	}
+	if res.EventType == EventApplied && !hasApplicationSubmittedSignal(in.From, in.Subject, in.Body, in.Snippet) {
+		if isJobBoardAlert(in.From, in.Subject, in.Body, in.Snippet) ||
+			strings.Contains(strings.ToLower(in.Subject+"\n"+in.Body), "look like a good fit") {
+			res.EventType = EventOther
+		}
+	}
 	return res
 }
 
@@ -23,12 +32,20 @@ func isPlausibleJobRejection(from, subject, body, snippet string) bool {
 	combined := strings.ToLower(subject + "\n" + body + "\n" + snippet)
 	phrases := []string{
 		"not moving forward",
+		"not move forward",
+		"decided not to move forward",
 		"will not be moving forward",
 		"will not be proceeding",
 		"regret to inform",
 		"not selected",
 		"decided to pursue other",
 		"other candidates",
+	}
+	if strings.Contains(strings.ToLower(from), "jobs-noreply@linkedin.com") {
+		combined := strings.ToLower(subject + "\n" + body + "\n" + snippet)
+		if strings.Contains(combined, "not move forward") || strings.Contains(combined, "not moving forward") {
+			return true
+		}
 	}
 	for _, p := range phrases {
 		if strings.Contains(combined, p) {
@@ -63,19 +80,87 @@ func isLikelyEmployerMail(eventType, company string) bool {
 }
 
 func isJobApplicationContext(from, subject, body, snippet string) bool {
+	if isJobBoardAlert(from, subject, body, snippet) {
+		return false
+	}
 	if isLikelyATSFrom(from) {
+		return hasApplicationSubmittedSignal(from, subject, body, snippet)
+	}
+	return hasApplicationSubmittedSignal(from, subject, body, snippet)
+}
+
+func hasApplicationSubmittedSignal(from, subject, body, snippet string) bool {
+	combined := strings.ToLower(subject + "\n" + body + "\n" + snippet)
+	submitted := []string{
+		"thank you for applying",
+		"thanks for applying",
+		"you applied",
+		"your application was sent",
+		"your application has been",
+		"we received your application",
+		"we've received your application",
+		"confirm that we have received your application",
+		"application submitted",
+		"successfully applied",
+		"confirming your application",
+		"application received",
+		"submitted your application",
+		"update on your application",
+		"regret to inform you that we will not",
+		"not moving forward with your application",
+		"interview", "assessment", "offer letter",
+	}
+	if strings.Contains(combined, "application for") && strings.Contains(combined, "received") &&
+		strings.Contains(combined, "thank you") {
 		return true
 	}
-	combined := strings.ToLower(subject + "\n" + body + "\n" + snippet)
-	hints := []string{
-		"application", "applied", "apply for", "you applied", "your application",
-		"resume", " résumé", "candidacy", "candidate", "position", " requisition",
-		"opening", "job you", "submitted your", "interview process", "hiring process",
-		"thank you for applying", "your interest in the", "for the role", "for the position",
-		"regret to inform you that we will not", "not moving forward with your application",
+	for _, p := range submitted {
+		if strings.Contains(combined, p) {
+			return true
+		}
 	}
-	for _, h := range hints {
-		if strings.Contains(combined, h) {
+	fromLower := strings.ToLower(from)
+	for _, ats := range []string{"greenhouse", "lever.co", "ashbyhq", "myworkday.com", "workday", "icims", "smartrecruiters", "kekamail.com"} {
+		if strings.Contains(fromLower, ats) {
+			return strings.Contains(combined, "application")
+		}
+	}
+	return false
+}
+
+// isJobBoardAlert is a job recommendation blast (Instahyre, Naukri, etc.), not an application you submitted.
+func isJobBoardAlert(from, subject, body, snippet string) bool {
+	fromLower := strings.ToLower(from)
+	combined := strings.ToLower(subject + "\n" + body + "\n" + snippet)
+
+	if hasApplicationSubmittedSignal(from, subject, body, snippet) {
+		return false
+	}
+
+	boardSenders := []string{
+		"instahyre.com", "naukri.com", "foundit.in", "shine.com", "iimjobs.com",
+		"indeed.com", "glassdoor.com", "wellfound.com", "cutshort.io", "hirist.com",
+	}
+	for _, b := range boardSenders {
+		if strings.Contains(fromLower, b) {
+			return true
+		}
+	}
+
+	alertPhrases := []string{
+		"has just posted",
+		"look like a good fit",
+		"looks like a good fit",
+		"based on your profile",
+		"based on your instahyre",
+		"you might be interested",
+		"recommended for you",
+		"jobs matching your profile",
+		"new job matching",
+		"matching jobs for you",
+	}
+	for _, p := range alertPhrases {
+		if strings.Contains(combined, p) {
 			return true
 		}
 	}

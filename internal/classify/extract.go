@@ -23,6 +23,8 @@ var (
 	reSubjectBrandPrefix  = regexp.MustCompile(`(?i)^([A-Za-z0-9][A-Za-z0-9 &.\-'/]{0,40}?)\s*[-–]\s*(?:invites you|your screening)`)
 	reJoiningUsAs         = regexp.MustCompile(`(?i)(?:interest in )?joining us as (?:a|an)\s+([A-Za-z0-9][^.!?\n]{2,60})`)
 	reScreeningForRole    = regexp.MustCompile(`(?i)your screening for\s+(.+?)\s+has been`)
+	reApplicationForRole  = regexp.MustCompile(`(?i)application for\s+(.+?)\s+received`)
+	reRoleForApplyingTo   = regexp.MustCompile(`(?i)for the role of\s+(.+?)(?:\s+through|\s+position|\.|,|$)`)
 )
 
 var atsDomains = map[string]string{
@@ -201,6 +203,8 @@ func ExtractRole(subject, body string) string {
 
 func extractRoleFromText(text string) string {
 	for _, re := range []*regexp.Regexp{
+		reApplicationForRole,
+		reRoleForApplyingTo,
 		reScreeningForRole,
 		reJoiningUsAs,
 		reRoleTitle,

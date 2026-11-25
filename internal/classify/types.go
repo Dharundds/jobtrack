@@ -1,6 +1,9 @@
 package classify
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 const (
 	EventApplied            = "applied"
@@ -42,5 +45,18 @@ type EventDetails struct {
 
 // Classifier maps an email to an event type and extracted fields.
 type Classifier interface {
-	Classify(in EmailInput) Result
+	Classify(ctx context.Context, in EmailInput) Result
+}
+
+// LLMClassifier classifies a single email via an external model (OpenAI-compatible API).
+type LLMClassifier interface {
+	Classify(ctx context.Context, in EmailInput) (Result, error)
+}
+
+// RunOptions selects LLM vs rule classification for one processor run.
+type RunOptions struct {
+	LLMAvailable    bool
+	LLM             LLMClassifier
+	LLMConcurrency  int
+	OnProgress      ProgressFunc
 }

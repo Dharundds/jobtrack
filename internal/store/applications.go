@@ -57,6 +57,35 @@ type MessageRow struct {
 	ClassifiedBy   string
 }
 
+func (s *Store) CountUnlinkedMessages(ctx context.Context) (int, error) {
+	var n int
+	err := s.DB.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM messages WHERE application_id IS NULL AND ignored = 0
+	`).Scan(&n)
+	return n, err
+}
+
+// ListUnlinkedMessagesNewest returns unlinked messages newest-first. limit <= 0 means no limit.
+func (s *Store) ListUnlinkedMessagesNewest(ctx context.Context, limit int) ([]MessageRow, error) {
+	q := `
+		SELECT id, gmail_id, thread_id, application_id, direction, from_addr, to_addr,
+			subject, snippet, body_excerpt, received_at, event_type, classified_by
+		FROM messages
+		WHERE application_id IS NULL AND ignored = 0
+		ORDER BY received_at DESC, id DESC`
+	var rows *sql.Rows
+	var err error
+	if limit > 0 {
+		rows, err = s.DB.QueryContext(ctx, q+` LIMIT ?`, limit)
+	} else {
+		rows, err = s.DB.QueryContext(ctx, q)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return scanMessageRows(rows)
+}
+
 func (s *Store) ListUnlinkedMessages(ctx context.Context) ([]MessageRow, error) {
 	rows, err := s.DB.QueryContext(ctx, `
 		SELECT id, gmail_id, thread_id, application_id, direction, from_addr, to_addr,
@@ -68,6 +97,10 @@ func (s *Store) ListUnlinkedMessages(ctx context.Context) ([]MessageRow, error) 
 	if err != nil {
 		return nil, err
 	}
+	return scanMessageRows(rows)
+}
+
+func scanMessageRows(rows *sql.Rows) ([]MessageRow, error) {
 	defer rows.Close()
 
 	var out []MessageRow
@@ -181,6 +214,20 @@ func (s *Store) EventExistsForMessage(ctx context.Context, messageID int64) (boo
 		return false, err
 	}
 	return true, nil
+}
+
+// ReplaceEventForMessage removes prior timeline rows for a message and inserts the new event.
+func (s *Store) ReplaceEventForMessage(
+	ctx context.Context,
+	applicationID, messageID int64,
+	eventType string,
+	occurredAt time.Time,
+	detailsJSON string,
+) error {
+	if _, err := s.DB.ExecContext(ctx, `DELETE FROM events WHERE message_id = ?`, messageID); err != nil {
+		return err
+	}
+	return s.InsertEvent(ctx, applicationID, messageID, eventType, occurredAt, detailsJSON)
 }
 
 func (s *Store) InsertEvent(ctx context.Context, applicationID, messageID int64, eventType string, occurredAt time.Time, detailsJSON string) error {

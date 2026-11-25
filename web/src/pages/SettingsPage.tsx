@@ -6,6 +6,7 @@ import {
   usePatchSettings,
   useRules,
   useSettings,
+  useTestLLM,
   useTriggerSync,
 } from "@/api/hooks";
 import type { Rule } from "@/api/types";
@@ -17,6 +18,7 @@ import { useToast } from "@/components/ui/Toast";
 export function SettingsPage() {
   const { data: settings, isLoading: settingsLoading } = useSettings();
   const patchSettings = usePatchSettings();
+  const testLLM = useTestLLM();
   const { data: rulesData, isLoading: rulesLoading } = useRules();
   const createRule = useCreateRule();
   const patchRule = usePatchRule();
@@ -26,6 +28,11 @@ export function SettingsPage() {
 
   const [gmailQuery, setGmailQuery] = useState("");
   const [syncMinutes, setSyncMinutes] = useState(30);
+  const [llmBaseURL, setLlmBaseURL] = useState("");
+  const [llmModel, setLlmModel] = useState("");
+  const [llmAPIKey, setLlmAPIKey] = useState("");
+  const [llmKeySet, setLlmKeySet] = useState(false);
+  const [llmConcurrency, setLlmConcurrency] = useState(2);
 
   const [newField, setNewField] = useState<Rule["field"]>("subject");
   const [newPattern, setNewPattern] = useState("");
@@ -35,19 +42,28 @@ export function SettingsPage() {
     if (!settings) return;
     setGmailQuery(settings.gmail_query);
     setSyncMinutes(settings.sync_interval_minutes);
+    setLlmBaseURL(settings.llm_base_url ?? "");
+    setLlmModel(settings.llm_model ?? "");
+    setLlmKeySet(settings.llm_api_key_set ?? false);
+    setLlmConcurrency(settings.llm_concurrency ?? 2);
+    setLlmAPIKey("");
   }, [settings]);
 
   const saveSettings = () => {
-    patchSettings.mutate(
-      {
-        gmail_query: gmailQuery,
-        sync_interval_minutes: syncMinutes,
-      },
-      {
-        onSuccess: () => toast("Settings saved"),
-        onError: (e) => toast(e.message, "error"),
-      },
-    );
+    const body: Parameters<typeof patchSettings.mutate>[0] = {
+      gmail_query: gmailQuery,
+      sync_interval_minutes: syncMinutes,
+      llm_base_url: llmBaseURL,
+      llm_model: llmModel,
+      llm_concurrency: llmConcurrency,
+    };
+    if (llmAPIKey.trim() !== "") {
+      body.llm_api_key = llmAPIKey;
+    }
+    patchSettings.mutate(body, {
+      onSuccess: () => toast("Settings saved"),
+      onError: (e) => toast(e.message, "error"),
+    });
   };
 
   const addRule = () => {
@@ -76,40 +92,128 @@ export function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
-      <header>
+      <header className="space-y-3">
         <h1 className="page-title">Settings</h1>
-        <p className="page-lead">Gmail query, sync interval, and classification rules.</p>
+        <p className="page-lead">Local LLM, Gmail sync, and regex classification rules.</p>
+        <nav className="flex flex-wrap gap-2 text-xs" aria-label="Settings sections">
+          <a href="#llm-settings" className="rounded-md border border-border px-2 py-1 hover:text-accent">
+            LLM
+          </a>
+          <a href="#sync-settings" className="rounded-md border border-border px-2 py-1 hover:text-accent">
+            Sync
+          </a>
+          <a href="#rules-settings" className="rounded-md border border-border px-2 py-1 hover:text-accent">
+            Rules
+          </a>
+        </nav>
       </header>
 
-      <section className="panel space-y-4 p-4">
-        <h2 className="text-sm font-medium">Sync</h2>
+      <section className="panel space-y-6 p-4">
         {settingsLoading ? (
-          <Skeleton className="h-24" />
+          <Skeleton className="h-48" />
         ) : (
           <>
-            <label className="block text-xs text-foreground-muted">
-              Gmail search query
-              <input
-                value={gmailQuery}
-                onChange={(e) => setGmailQuery(e.target.value)}
-                className="mt-1 h-9 w-full rounded-md border border-border bg-surface px-2 font-mono text-sm"
-                placeholder="e.g. newer_than:90d (subject:application OR ...)"
-              />
-            </label>
-            <label className="block text-xs text-foreground-muted">
-              Sync interval (minutes, stored in DB; worker uses env at startup)
-              <input
-                type="number"
-                min={5}
-                max={1440}
-                value={syncMinutes}
-                onChange={(e) => setSyncMinutes(Number(e.target.value))}
-                className="mt-1 h-9 w-32 rounded-lg border border-border bg-surface-elevated px-2 text-sm"
-              />
-            </label>
+            <div id="llm-settings" className="scroll-mt-24 space-y-3">
+              <h2 className="text-sm font-semibold text-foreground">LLM classification (LM Studio)</h2>
+              <p className="text-xs text-foreground-muted">
+                OpenAI-compatible API.                 Sync classifies with rules only; use the LLM button in the top bar to re-review pipeline
+                applications (pick how many, between 2 and the pending total).
+              </p>
+              <label className="block text-xs text-foreground-muted">
+                Base URL
+                <input
+                  value={llmBaseURL}
+                  onChange={(e) => setLlmBaseURL(e.target.value)}
+                  className="mt-1 h-9 w-full rounded-md border border-border bg-surface px-2 font-mono text-sm"
+                  placeholder="http://localhost:1234/v1"
+                />
+              </label>
+              <label className="block text-xs text-foreground-muted">
+                Model name
+                <input
+                  value={llmModel}
+                  onChange={(e) => setLlmModel(e.target.value)}
+                  className="mt-1 h-9 w-full rounded-md border border-border bg-surface px-2 font-mono text-sm"
+                  placeholder="exact id from LM Studio, e.g. qwen3.5-9b"
+                />
+              </label>
+              <label className="block text-xs text-foreground-muted">
+                Parallel LLM requests (1–8, default 2)
+                <input
+                  type="number"
+                  min={1}
+                  max={8}
+                  value={llmConcurrency}
+                  onChange={(e) => setLlmConcurrency(Number(e.target.value))}
+                  className="mt-1 h-9 w-24 rounded-md border border-border bg-surface px-2 font-mono text-sm"
+                />
+              </label>
+              <label className="block text-xs text-foreground-muted">
+                API key {llmKeySet ? "(saved — leave blank to keep)" : "(optional)"}
+                <input
+                  type="password"
+                  value={llmAPIKey}
+                  onChange={(e) => setLlmAPIKey(e.target.value)}
+                  autoComplete="off"
+                  className="mt-1 h-9 w-full rounded-md border border-border bg-surface px-2 font-mono text-sm"
+                  placeholder={llmKeySet ? "••••••••" : "optional"}
+                />
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="secondary"
+                  disabled={testLLM.isPending || !llmBaseURL.trim() || !llmModel.trim()}
+                  onClick={() =>
+                    testLLM.mutate(undefined, {
+                      onSuccess: (r) =>
+                        toast(
+                          r.reachable ? "LLM reachable" : "LLM not reachable — save settings first if you changed them",
+                          r.reachable ? "success" : "error",
+                        ),
+                      onError: (e) => toast(e.message, "error"),
+                    })
+                  }
+                >
+                  Test connection
+                </Button>
+              </div>
+            </div>
+
+            <hr className="border-border" />
+
+            <div id="sync-settings" className="scroll-mt-24 space-y-3">
+              <h2 className="text-sm font-semibold text-foreground">Gmail sync</h2>
+              <label className="block text-xs text-foreground-muted">
+                Gmail search query
+                <input
+                  value={gmailQuery}
+                  onChange={(e) => setGmailQuery(e.target.value)}
+                  className="mt-1 h-9 w-full rounded-md border border-border bg-surface px-2 font-mono text-sm"
+                  placeholder="e.g. newer_than:90d (subject:application OR ...)"
+                />
+              </label>
+              <label className="block text-xs text-foreground-muted">
+                Sync interval (minutes, stored in DB; worker uses env at startup)
+                <input
+                  type="number"
+                  min={5}
+                  max={1440}
+                  value={syncMinutes}
+                  onChange={(e) => setSyncMinutes(Number(e.target.value))}
+                  className="mt-1 h-9 w-32 rounded-lg border border-border bg-surface-elevated px-2 text-sm"
+                />
+              </label>
+              <p className="text-xs text-foreground-muted">
+                After changing the Gmail query, run <strong className="font-medium text-foreground">Full rescan</strong>{" "}
+                so older matching mail is listed again (incremental sync only fetches new mail).
+              </p>
+            </div>
+
+            <hr className="border-border" />
+
             <div className="flex flex-wrap gap-2">
               <Button onClick={saveSettings} disabled={patchSettings.isPending}>
-                Save sync settings
+                Save settings
               </Button>
               <Button
                 variant="secondary"
@@ -133,16 +237,12 @@ export function SettingsPage() {
                 Full rescan
               </Button>
             </div>
-            <p className="text-xs text-foreground-muted">
-              After changing the Gmail query, run <strong className="font-medium text-foreground">Full rescan</strong>{" "}
-              so older matching mail is listed again (incremental sync only fetches new mail).
-            </p>
           </>
         )}
       </section>
 
-      <section className="panel space-y-4 p-4">
-        <h2 className="text-sm font-medium">Classification rules</h2>
+      <section id="rules-settings" className="panel scroll-mt-24 space-y-4 p-4">
+        <h2 className="text-sm font-semibold text-foreground">Classification rules</h2>
         {rulesLoading ? (
           <Skeleton className="h-40" />
         ) : rules.length === 0 ? (

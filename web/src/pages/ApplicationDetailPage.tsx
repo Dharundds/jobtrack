@@ -7,6 +7,7 @@ import {
   useIgnoreMessage,
   useMergeApplications,
   usePatchApplication,
+  useReviewApplicationLLM,
   useSplitMessage,
 } from "@/api/hooks";
 import type { ApplicationStatus, Message } from "@/api/types";
@@ -33,6 +34,7 @@ export function ApplicationDetailPage() {
   const deleteApp = useDeleteApplication();
   const splitMsg = useSplitMessage(id);
   const ignoreMsg = useIgnoreMessage(id);
+  const reviewLLM = useReviewApplicationLLM(id);
   const { toast } = useToast();
 
   const app = data?.application;
@@ -86,6 +88,29 @@ export function ApplicationDetailPage() {
         onError: (e) => toast(e.message, "error"),
       },
     );
+  };
+
+  const onReviewLLM = () => {
+    if (!app) return;
+    if (
+      !window.confirm(
+        "Let the LLM review this listing? It may update company/role/status or delete the row if these emails are not a job application.",
+      )
+    ) {
+      return;
+    }
+    reviewLLM.mutate(undefined, {
+      onSuccess: (res) => {
+        if (res.action === "deleted" || res.application_deleted) {
+          toast(res.reason ? `Removed: ${res.reason}` : "Listing removed by LLM review");
+          navigate("/applications");
+          return;
+        }
+        toast(res.reason ? `Updated: ${res.reason}` : "Listing updated by LLM");
+        void refetch();
+      },
+      onError: (e) => toast(e.message, "error"),
+    });
   };
 
   const onDeleteListing = () => {
@@ -219,6 +244,14 @@ export function ApplicationDetailPage() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button
+            variant={data?.needs_llm_review ? "primary" : "secondary"}
+            onClick={onReviewLLM}
+            disabled={reviewLLM.isPending}
+            title="Requires LLM configured in Settings and LM Studio running"
+          >
+            {reviewLLM.isPending ? "Reviewing…" : "Review with LLM"}
+          </Button>
           <Button variant="danger" onClick={onDeleteListing} disabled={deleteApp.isPending}>
             Delete listing
           </Button>

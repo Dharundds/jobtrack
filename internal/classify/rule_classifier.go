@@ -1,6 +1,7 @@
 package classify
 
 import (
+	"context"
 	"regexp"
 	"sort"
 	"strings"
@@ -49,7 +50,8 @@ func NewRuleClassifier(rules []Rule) *RuleClassifier {
 	return &RuleClassifier{rules: sorted}
 }
 
-func (c *RuleClassifier) Classify(in EmailInput) Result {
+func (c *RuleClassifier) Classify(ctx context.Context, in EmailInput) Result {
+	_ = ctx
 	texts := map[string]string{
 		"subject": in.Subject,
 		"body":    strings.Join([]string{in.Body, in.Snippet}, "\n"),
@@ -71,6 +73,20 @@ func (c *RuleClassifier) Classify(in EmailInput) Result {
 				Details:      details,
 				ClassifiedBy: "rule",
 			}
+		}
+	}
+	if hasApplicationSubmittedSignal(in.From, in.Subject, in.Body, in.Snippet) {
+		company := ExtractCompany(in.From, in.Subject, in.Body)
+		role := ExtractRole(in.Subject, in.Body)
+		if role == "" {
+			role = ExtractRole(in.Subject, in.Snippet)
+		}
+		return Result{
+			EventType:    EventApplied,
+			Company:      company,
+			Role:         role,
+			Details:      ExtractEventDetails(in.Body + "\n" + in.Snippet),
+			ClassifiedBy: "rule",
 		}
 	}
 	return Result{

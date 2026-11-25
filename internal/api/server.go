@@ -65,7 +65,8 @@ func NewServer(cfg *config.Config, st *store.Store, worker *syncworker.Worker) *
 		Log:   log,
 	}
 	syncH := &handlers.SyncHandler{Worker: worker}
-	appsH := &handlers.ApplicationsHandler{Store: st}
+	classifyLLMH := &handlers.ClassifyLLMHandler{Worker: worker, Store: st}
+	appsH := &handlers.ApplicationsHandler{Store: st, Cfg: cfg}
 	rulesH := &handlers.RulesHandler{Store: st}
 	statsH := &handlers.StatsHandler{Store: st}
 	settingsH := &handlers.SettingsHandler{Store: st, Cfg: cfg}
@@ -78,10 +79,13 @@ func NewServer(cfg *config.Config, st *store.Store, worker *syncworker.Worker) *
 	protected.Use(middleware.RequireAccount(st))
 	protected.POST("/sync", syncH.Trigger)
 	protected.GET("/sync/status", syncH.Status)
+	protected.GET("/classify/llm/pending", classifyLLMH.Pending)
+	protected.POST("/classify/llm", classifyLLMH.Trigger)
 
 	protected.GET("/applications", appsH.List)
 	protected.GET("/applications/:id", appsH.Get)
 	protected.PATCH("/applications/:id", appsH.Patch)
+	protected.POST("/applications/:id/review-llm", appsH.ReviewWithLLM)
 	protected.DELETE("/applications/:id", appsH.Delete)
 	protected.POST("/applications/:id/messages/:mid/split", appsH.SplitMessage)
 	protected.DELETE("/applications/:id/messages/:mid", appsH.IgnoreMessage)
@@ -95,6 +99,7 @@ func NewServer(cfg *config.Config, st *store.Store, worker *syncworker.Worker) *
 	protected.GET("/stats", statsH.Get)
 	protected.GET("/settings", settingsH.Get)
 	protected.PATCH("/settings", settingsH.Patch)
+	protected.POST("/settings/llm/test", settingsH.TestLLM)
 
 	authRoutes := r.Group("/auth")
 	authRoutes.GET("/login", authH.Login)
